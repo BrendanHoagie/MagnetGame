@@ -1,7 +1,9 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using static TMPro.SpriteAssetUtilities.TexturePacker_JsonArray;
 
 public class PlayerMovement : MonoBehaviour
 {
@@ -22,9 +24,13 @@ public class PlayerMovement : MonoBehaviour
     public SpriteRenderer spriteRenderer;
     public Animator animator;
 
-    public AudioClip collid;
-    private AudioSource effectsAudioSource;
+    [SerializeField] private AudioClip collid;
+    [SerializeField] private AudioClip interactiableCollid;
+
     public string popUpMessage;
+
+    private bool wasGrounded = false;
+    public ParticleSystem dust;
 
     private enum playerWalkState
     {
@@ -55,11 +61,19 @@ public class PlayerMovement : MonoBehaviour
 
         if (move < 0) //flip sprite depending on which dir we move
         {
-            spriteRenderer.flipX = false;
+            if (rb.velocity.x > 2)
+            {
+                CreateDust();
+            }
+            transform.rotation = Quaternion.Euler(0, 180, 0);
         }
         else if (move > 0)
         {
-            spriteRenderer.flipX = true;
+            if (rb.velocity.x > 2)
+            {
+                CreateDust();
+            }
+            transform.rotation = Quaternion.Euler(0, 0, 0);
         }
 
         bool hitLeft = Physics2D.Raycast(feetPosition.position, Vector2.left, raycastRange, LayerMask.GetMask("Wall")).collider != null;
@@ -89,8 +103,6 @@ public class PlayerMovement : MonoBehaviour
         if ((hitLeft || hitRight))
         {
             // If there's a wall on the left or right, allow vertical movement
-
-
             if ((Input.GetKeyUp("space")))
             {
                 rb.velocity = Vector2.up * jumpForce;
@@ -119,8 +131,8 @@ public class PlayerMovement : MonoBehaviour
 
         if ((Input.GetKeyUp("space") && isGrounded) || (hitInteractable && Input.GetKeyUp("space"))) //old ver  if ( (Input.GetKeyUp("space") && isGrounded ) || (isOnInteractable && Input.GetKeyUp("space"))) 
         {
+            CreateDust();
             rb.AddForce(new Vector2(rb.velocity.x, jumpForce * Vector2.up.y), ForceMode2D.Impulse);
-            //rb.velocity = Vector2.up * jumpForce;  //only change Y velocity while not changing the x velocty, cuase vector2.up 
             animator.SetBool("isGrounded", false);
         }
         else if ((hitInteractable && Input.GetKeyUp("space")))
@@ -129,17 +141,24 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-    public void OnCollisionEnter(Collision collision)
+    private void CreateDust()
     {
-        if (collision.gameObject.tag == "Ground" && isGrounded == false)
-        {
-            isGrounded = true;
-            effectsAudioSource.PlayOneShot(collid);
-        }
+        dust.Play();
     }
 
     private void FixedUpdate()
     {
         rb.velocity = new Vector2(move * speed, rb.velocity.y);
+
+        if (hitInteractable && !wasGrounded)
+        {
+            SoundFXManager.Instance.PlaySoundFXClip(interactiableCollid, transform, 0.6f);
+        }
+        else if (isGrounded && !wasGrounded)
+        {
+            SoundFXManager.Instance.PlaySoundFXClip(collid, transform, 0.6f);
+        }
+
+        wasGrounded = isGrounded || hitInteractable;
     }
 }
